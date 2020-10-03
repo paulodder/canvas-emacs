@@ -3,7 +3,7 @@
 
 (defvar canvas-baseurl nil "Base url of canvas environment")
 (defvar canvas-token nil "Canvas token")
-(defvar canvas--courses nil "List of courses.")
+(defvar canvas--courses nil "List of your courses.")
 (defvar canvas--userid nil "User id")
 
 
@@ -16,9 +16,15 @@
     (canvas--reload-courses)))
 
 (defun canvas--reload-courses ()
-  (let ((courses (canvas--request "/api/v1/courses")))
-    (setq canvas--courses courses)
-    courses))
+  (setq canvas--courses (cl-sort (canvas--request (format "/api/v1/users/%s/courses"
+                                                          (canvas--get-user-id))
+                                                  "GET"
+                                                  '((per_page . 100)))
+                                 (lambda (a b)
+                                   (string-greaterp (canvas--json-find '(start_at)
+                                                                    a)
+                                                 (canvas--json-find '(start_at)
+                                                                    b))))))
 
 (defun canvas--get-user-id (&optional force-reload)
   (if (and canvas--userid
@@ -30,6 +36,15 @@
   (setq canvas--userid (canvas--json-find '(id)
                                           (canvas--request "/api/v1/users/self"))))
 
+(defun canvas--encode-params (params)
+  "encodes params in GET format"
+  (concat "?"
+          (string-join (seq-map (lambda (keyval)
+                                  (format "%s=%s"
+                                          (car keyval)
+                                          (cdr keyval)))
+                                params)
+                       "&")))
 
 ;; adapted from https://github.com/titaniumbones/org-lms
 (defun canvas--request (query &optional request-type request-params
@@ -38,13 +53,15 @@
   Optionally send REQUEST-PARAMS as JSON data, and write results to FILE, which should be a full path.
     "
   (let ((json-params (json-encode request-params))
-        (target (concat canvas-baseurl query)))
+        (target (concat canvas-baseurl
+                        query
+                        (if (string= request-type "GET")
+                            (canvas--encode-params request-params)))))
     (if canvas-token
         (request-response-data (request target
-                                 :type "GET"
-                                 :headers `(("Authorization" . ,(concat "Bearer " canvas-token))
-                                            ("Content-Type" . "application/json")):sync
-                                 t
+                                 :type (if request-type request-type "GET"):headers`(("Authorization" . ,(concat "Bearer " canvas-token))
+                                                                                     ("Content-Type" . "application/json"))
+                                 :sync t
                                  :data (if json-params json-params nil):encoding'no-conversion
                                  :parser (lambda ()
                                            (if (and (boundp 'file)
