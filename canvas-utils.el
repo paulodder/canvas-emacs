@@ -4,6 +4,7 @@
 (defvar canvas-baseurl nil "Base url of canvas environment")
 (defvar canvas-token nil "Canvas token")
 (defvar canvas--courses nil "List of courses.")
+(defvar canvas--userid nil "User id")
 
 
 
@@ -11,12 +12,24 @@
   (if (and canvas--courses
            (not force-reload))
       canvas--courses
+    ;; (if active-only
     (canvas--reload-courses)))
 
 (defun canvas--reload-courses ()
   (let ((courses (canvas--request "/api/v1/courses")))
     (setq canvas--courses courses)
     courses))
+
+(defun canvas--get-user-id (&optional force-reload)
+  (if (and canvas--userid
+           (not force-reload))
+      canvas--userid
+    (canvas--reload-userid)))
+
+(defun canvas--reload-userid ()
+  (setq canvas--userid (canvas--json-find '(id)
+                                          (canvas--request "/api/v1/users/self"))))
+
 
 ;; adapted from https://github.com/titaniumbones/org-lms
 (defun canvas--request (query &optional request-type request-params
@@ -45,3 +58,36 @@
                                  :error (cl-function (lambda (&key error-thrown data status &allow-other-keys)
                                                        (message "NO PAYLOAD: %s" error-thrown)))))
       (user-error "Please set a value for for `canvas-token' in order to complete API calls"))))
+
+
+
+(defun canvas--json-find (keys json)
+  "Given key sequence and json, return corresponding element from json"
+  (cond
+   ((= (length keys) 0) json)
+   ((= (length json) 0)
+    (error (format "Key: %s not found"
+                   (first keys))))
+   (t (if (eq (first keys) (car (first json)))
+          (canvas--json-find (rest keys)
+                             (rest (first json)))
+        (canvas--json-find keys
+                           (rest json))))))
+
+(cl-defmacro canvas--with-json-bind
+    ((&rest defs) json
+     &body
+     body)
+  (declare (indent 2))
+  (let ((json-sym (gensym "json")))
+    `(let ((,json-sym ,json))
+       (let ,(loop for
+                   (sym path)
+                   in
+                   defs
+                   collect
+                   `(,sym
+                     (canvas--json-find ',path ,json-sym)))
+         ,@body))))
+
+;; (map 'vector (lambda (j) (canvas--json-find '(end_at) j)) (canvas--list-courses t))
