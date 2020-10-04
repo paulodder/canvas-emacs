@@ -22,9 +22,9 @@
                                                   '((per_page . 100)))
                                  (lambda (a b)
                                    (string-greaterp (canvas--json-find '(start_at)
-                                                                    a)
-                                                 (canvas--json-find '(start_at)
-                                                                    b))))))
+                                                                       a)
+                                                    (canvas--json-find '(start_at)
+                                                                       b))))))
 
 (defun canvas--get-user-id (&optional force-reload)
   (if (and canvas--userid
@@ -57,6 +57,7 @@
                         query
                         (if (string= request-type "GET")
                             (canvas--encode-params request-params)))))
+    (message target)
     (if canvas-token
         (request-response-data (request target
                                  :type (if request-type request-type "GET"):headers`(("Authorization" . ,(concat "Bearer " canvas-token))
@@ -75,6 +76,7 @@
                                  :error (cl-function (lambda (&key error-thrown data status &allow-other-keys)
                                                        (message "NO PAYLOAD: %s" error-thrown)))))
       (user-error "Please set a value for for `canvas-token' in order to complete API calls"))))
+
 
 
 
@@ -107,4 +109,90 @@
                      (canvas--json-find ',path ,json-sym)))
          ,@body))))
 
-;; (map 'vector (lambda (j) (canvas--json-find '(end_at) j)) (canvas--list-courses t))
+(defun canvas--get-course-by-key (key value)
+  (cl-find 17395
+           (canvas--list-courses)
+           :key #'(lambda (j)
+                    (canvas--json-find '(id)
+                                       j)):test#'equal))
+
+(defun canvas--choose-course ()
+  "prompts user to select a course, returns course id"
+  (canvas--choose-from-jsons "course"
+                             '(name)
+                             (canvas--list-courses)))
+
+(defun canvas--choose-assignment (courseid)
+  "for given course id prompts user to select course"
+  (canvas--choose-from-jsons "assignment"
+                             '(name)
+                             (canvas--request (format "/api/v1/courses/%s/assignments"
+                                                      courseid
+                                                      '((per_page . 100))))))
+
+
+(defun canvas--choose-from-jsons (name path-to-show jsons)
+  "Given list of jsons, name of what is going to be picked, and
+the path-to-show determining which value of each json to show in
+the minibuffer, returns the id of the chosen object
+e.g. given a list of course jsons, \"course\", and '(name), this function will
+prompt the user to select a course based on a list of course names"
+  (let* ((values (seq-map (lambda (j)
+                            (canvas--json-find path-to-show j))
+                          jsons))
+         (value2id (seq-map (lambda (j)
+                              `(,(canvas--json-find path-to-show j)
+                                . ,(canvas--json-find '(id)
+                                                      j)))
+                            jsons)))
+    (let ((chosen-json (completing-read (concat (capitalize name)
+                                                ": ")
+                                        values
+                                        nil
+                                        t)))
+      (cdr (cl-find chosen-json value2id :key #'first
+                    :test #'equal)))))
+
+(defun canvas--choose-announcement (courseid)
+  (canvas--choose-from-jsons "announcement"
+                             '(title)
+                             (canvas--request "/api/v1/announcements/"
+                                              "GET"
+                                              `(("context_codes[]" . ,(concat "course_"
+                                                                              (int-to-string courseid)))))))
+
+
+(defun canvas--render-json (path-to-name path-to-content json)
+  "given json object renders it in a separate buffer named according to path-to-name and"
+  (let* ((buffer-name (canvas--json-find path-to-name json))
+         (buffer-content-raw (canvas--json-find path-to-content json))
+         (buffer-content (replace-in-string "\\" "" buffer-content-raw))
+         (out-buf (get-buffer-create buffer-name)))
+    (progn
+      (set-buffer out-buf)
+      (insert buffer-content)
+      (shr-render-region (point-min)
+                         (point-max))
+      (display-buffer out-buf))))
+
+(defun canvas-view-assignment ()
+  (interactive)
+  (let* ((courseid (canvas--choose-course))
+         (ass-id (canvas--choose-assignment courseid)))
+    (canvas--render-json '(name)
+                         '(description)
+                         (canvas--request (format "/api/v1/courses/%s/assignments/%s"
+                                                  courseid ass-id)))))
+
+(defun canvas-view-announcement ()
+  (interactive)
+  (let* ((courseid (canvas--choose-course))
+         (announcement-id (canvas--choose-announcement courseid)))
+    (message announcement-id)
+    (message courseid)
+    (canvas--render-json '(title)
+                         '(message)
+                         (canvas--request (format "/api/v1/courses/%s/announcement/%s"
+                                                  courseid announcement-id)))))
+
+(provide 'canvas-utils)
