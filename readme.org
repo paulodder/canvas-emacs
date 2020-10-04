@@ -1,0 +1,17 @@
+#+TITLE: readme
+
+* setup
+clone this repo and add the following emacs lisp to your init accordingly:
+#+begin_src emacs-lisp
+(add-to-list 'load-path "/path/to/this/repo")
+(require 'canvas-utils)
+(setq canvas-baseurl "https://canvas.<.nl") ; url you visit to go to the canvas
+                                            ; instance of your institution
+(setq canvas-token "your-canvas-token") ; when logged in generate an access
+                                        ; token under Account > Settings
+                                        ; > Approved integrations
+#+end_src
+
+* functions
+- =M-x canvas-view-assignment=
+- =M-x canvas-view-announcement=

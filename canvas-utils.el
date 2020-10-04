@@ -57,7 +57,6 @@
                         query
                         (if (string= request-type "GET")
                             (canvas--encode-params request-params)))))
-    (message target)
     (if canvas-token
         (request-response-data (request target
                                  :type (if request-type request-type "GET"):headers`(("Authorization" . ,(concat "Bearer " canvas-token))
@@ -109,12 +108,13 @@
                      (canvas--json-find ',path ,json-sym)))
          ,@body))))
 
-(defun canvas--get-course-by-key (key value)
-  (cl-find 17395
-           (canvas--list-courses)
+(defun canvas--get-by-key (key-path value jsons)
+  "given key-path, its desired value, and list of jsons to choose
+from, returns the json such that its key-path value equals value"
+  (cl-find value
+           jsons
            :key #'(lambda (j)
-                    (canvas--json-find '(id)
-                                       j)):test#'equal))
+                    (canvas--json-find key-path j)):test#'equal))
 
 (defun canvas--choose-course ()
   "prompts user to select a course, returns course id"
@@ -154,12 +154,17 @@ prompt the user to select a course based on a list of course names"
                     :test #'equal)))))
 
 (defun canvas--choose-announcement (courseid)
-  (canvas--choose-from-jsons "announcement"
-                             '(title)
-                             (canvas--request "/api/v1/announcements/"
+  "Given courseid, prompts user to select announcement, returns corresponding json"
+  (let* ((announcement-jsons (canvas--request "/api/v1/announcements/"
                                               "GET"
                                               `(("context_codes[]" . ,(concat "course_"
-                                                                              (int-to-string courseid)))))))
+                                                                              (int-to-string courseid))))))
+         (announcement-id (canvas--choose-from-jsons "announcement"
+                                                     '(title)
+                                                     announcement-jsons)))
+    (canvas--get-by-key '(id)
+                        announcement-id
+                        announcement-jsons)))
 
 
 (defun canvas--render-json (path-to-name path-to-content json)
@@ -175,6 +180,8 @@ prompt the user to select a course based on a list of course names"
                          (point-max))
       (display-buffer out-buf))))
 
+;;; exposed functions
+
 (defun canvas-view-assignment ()
   (interactive)
   (let* ((courseid (canvas--choose-course))
@@ -187,12 +194,9 @@ prompt the user to select a course based on a list of course names"
 (defun canvas-view-announcement ()
   (interactive)
   (let* ((courseid (canvas--choose-course))
-         (announcement-id (canvas--choose-announcement courseid)))
-    (message announcement-id)
-    (message courseid)
+         (announcement-json (canvas--choose-announcement courseid)))
     (canvas--render-json '(title)
                          '(message)
-                         (canvas--request (format "/api/v1/courses/%s/announcement/%s"
-                                                  courseid announcement-id)))))
+                         announcement-json)))
 
 (provide 'canvas-utils)
