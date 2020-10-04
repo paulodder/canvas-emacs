@@ -178,7 +178,8 @@ prompt the user to select a course based on a list of course names"
       (insert buffer-content)
       (shr-render-region (point-min)
                          (point-max))
-      (display-buffer out-buf))))
+      (select-window (display-buffer out-buf))
+      (goto-char (point-min)))))
 
 ;;; exposed functions
 
