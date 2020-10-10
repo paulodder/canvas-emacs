@@ -16,3 +16,5 @@ clone this repo and add the following emacs lisp to your init accordingly:
 * functions
 - =M-x canvas-view-assignment=
 - =M-x canvas-view-announcement=
+- =M-x canvas-view-module=
+- =M-x canvas-view-course=
