@@ -1,9 +1,13 @@
 (require 'request)
 (require 'json)
 
-(defvar canvas-baseurl nil "Base url of canvas environment")
-(defvar canvas-token nil "Canvas token")
+(defcustom canvas-baseurl nil "Base url of canvas environment")
+(defcustom canvas-token nil "Canvas token")
+
+
 (defvar canvas--courses nil "List of your courses.")
+(defvar canvas--courseid2modules '()
+  "List with cons cells of form (courseid . <seq of module jsons (incl items)>)")
 (defvar canvas--userid nil "User id")
 
 
@@ -12,7 +16,6 @@
   (if (and canvas--courses
            (not force-reload))
       canvas--courses
-    ;; (if active-only
     (canvas--reload-courses)))
 
 (defun canvas--reload-courses ()
@@ -25,6 +28,42 @@
                                                                        a)
                                                     (canvas--json-find '(start_at)
                                                                        b))))))
+
+(defun canvas--list-modules (courseid &optional force-reload)
+  "lists module jsons for given courseid"
+  (let ((course-modules (canvas--json-find `(,courseid)
+                                           canvas--courseid2modules)))
+    (if (and course-modules
+             (not force-reload))
+        course-modules
+      (canvas--reload-modules courseid))))
+
+(defun canvas--reload-modules (courseid)
+  "reloads modules for given courseid and sets them accordingly in canvas--courseid2modules"
+  (let ((courseid2modules-without-current (seq-filter (lambda (courseid-module)
+                                                        (not (equal courseid (car courseid-module))))
+                                                      canvas--courseid2modules))
+        (modules (canvas--request (format "/api/v1/courses/%s/modules" courseid)
+                                  "GET"
+                                  '((per_page . 100)
+                                    ("include[]" . "items")))))
+    (setq canvas--courseid2modules (append courseid2modules-without-current
+                                           `((,courseid . ,modules))))
+    modules))
+
+
+
+(defun canvas--flatten (seq)
+  (cond
+   ((null seq) nil)
+   ((atom seq)
+    (list seq))
+   (t (append (car seq)
+              (canvas--flatten (cdr seq))))))
+
+
+
+
 
 (defun canvas--get-user-id (&optional force-reload)
   (if (and canvas--userid
@@ -137,26 +176,30 @@ from, returns the json such that its key-path value equals value"
                                                       '((per_page . 100))))))
 
 
-(defun canvas--choose-from-jsons (name path-to-show jsons)
+(cl-defun canvas--choose-from-jsons
+    (name path-to-show
+          jsons
+          &key
+          (path-to-return '(id)))
   "Given list of jsons, name of what is going to be picked, and
 the path-to-show determining which value of each json to show in
 the minibuffer, returns the id of the chosen object
 e.g. given a list of course jsons, \"course\", and '(name), this function will
 prompt the user to select a course based on a list of course names"
-  (let* ((values (seq-map (lambda (j)
-                            (canvas--json-find path-to-show j))
-                          jsons))
-         (value2id (seq-map (lambda (j)
-                              `(,(canvas--json-find path-to-show j)
-                                . ,(canvas--json-find '(id)
-                                                      j)))
-                            jsons)))
+  (let* ((show-values (seq-map (lambda (j)
+                                 (canvas--json-find path-to-show j))
+                               jsons))
+         (show-value2return-value (seq-map (lambda (j)
+                                             `(,(canvas--json-find path-to-show j)
+                                               . ,(canvas--json-find path-to-return j)))
+                                           jsons)))
     (let ((chosen-json (completing-read (concat (capitalize name)
                                                 ": ")
-                                        values
+                                        show-values
                                         nil
                                         t)))
-      (cdr (cl-find chosen-json value2id :key #'first
+      (cdr (cl-find chosen-json show-value2return-value
+                    :key #'first
                     :test #'equal)))))
 
 (defun canvas--choose-announcement (courseid)
@@ -171,6 +214,31 @@ prompt the user to select a course based on a list of course names"
     (canvas--get-by-key '(id)
                         announcement-id
                         announcement-jsons)))
+
+(defun canvas--choose-module-item (courseid)
+  "returns url for selected module item"
+  (let ((module-items (canvas--flatten (seq-map (lambda (moduleid2items)
+                                                  (let ((module-name (canvas--json-find '(name)
+                                                                                        moduleid2items))
+                                                        ;; (module-id (canvas--json-find '(id)
+                                                        ;;                               moduleid2items))
+                                                        (module-items (canvas--json-find '(items)
+                                                                                         moduleid2items)))
+                                                    (seq-map (lambda (module-item)
+                                                               (let ((module-item-id (canvas--json-find '(id)
+                                                                                                        module-item)))
+                                                                 `((url . ,(canvas--json-find '(html_url)
+                                                                                              module-item))
+                                                                   (fancy-name . ,(string-join (list module-name
+                                                                                                     (canvas--json-find '(title)
+                                                                                                                        module-item))
+                                                                                               "/")))))
+                                                             module-items)))
+                                                (canvas--list-modules courseid)))))
+    (canvas--choose-from-jsons "module"
+                               '(fancy-name)
+                               module-items
+                               :path-to-return '(url))))
 
 
 (defun canvas--render-json (path-to-name path-to-content json)
@@ -189,6 +257,14 @@ prompt the user to select a course based on a list of course names"
 
 ;;; exposed functions
 
+(defun canvas-view-course ()
+  (interactive)
+  (let* ((courseid (canvas--choose-course))
+         (front-page-json (canvas--request (format "/api/v1/courses/%s/front_page" courseid))))
+    (canvas--render-json '(url)
+                         '(body)
+                         front-page-json)))
+
 (defun canvas-view-assignment ()
   (interactive)
   (let* ((courseid (canvas--choose-course))
@@ -206,12 +282,13 @@ prompt the user to select a course based on a list of course names"
                          '(message)
                          announcement-json)))
 
-(defun canvas-view-announcement ()
+
+(defun canvas-view-module ()
   (interactive)
   (let* ((courseid (canvas--choose-course))
-         (announcement-json (canvas--choose-announcement courseid)))
-    (canvas--render-json '(title)
-                         '(message)
-                         announcement-json)))
+         (url (canvas--choose-module-item courseid)))
+    (funcall shr-external-browser url)))
+
+
 
 (provide 'canvas-utils)
