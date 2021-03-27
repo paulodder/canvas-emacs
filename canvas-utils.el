@@ -250,7 +250,8 @@ prompt the user to select a course based on a list of course names"
     (progn
       (set-buffer out-buf)
       (insert buffer-content)
-      (shr-render-region (current-buffer))
+      (shr-render-region (point-max)
+                         (point-max))
       (select-window (display-buffer out-buf))
       (goto-char (point-min)))))
 
