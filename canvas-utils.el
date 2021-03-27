@@ -287,7 +287,7 @@ prompt the user to select a course based on a list of course names"
   (interactive)
   (let* ((courseid (canvas--choose-course))
          (url (canvas--choose-module-item courseid)))
-    (funcall browse-url-default-handlers url)))
+    (funcall browse-url-browser-function url)))
 
 
 
