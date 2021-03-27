@@ -245,7 +245,7 @@ prompt the user to select a course based on a list of course names"
   "given json object renders it in a separate buffer named according to path-to-name and"
   (let* ((buffer-name (canvas--json-find path-to-name json))
          (buffer-content-raw (canvas--json-find path-to-content json))
-         (buffer-content (replace-regexp-in-string "/(\\\\)/g" "" buffer-content-raw))
+         (buffer-content (replace-regexp-in-string "/(\\\\)/g" nil buffer-content-raw))
          (out-buf (get-buffer-create buffer-name)))
     (progn
       (set-buffer out-buf)
