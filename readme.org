@@ -7,11 +7,14 @@ clone this repo and add the following emacs lisp to your init accordingly:
 (require 'canvas-utils)
 (setq canvas-baseurl "https://canvas.baseurl.com") ; url you visit to go to the
                                         ; canvas instance of your institution
-                                        ; (e.g. https://canvas.uva.nl)
+                                        ; (e.g. https://canvas.vt.edu)
 (setq canvas-token "your-canvas-token") ; when logged in generate an access
                                         ; token under Account > Settings
                                         ; > Approved integrations
 #+end_src
+
+* known issues
+Courses without a front page will throw an error
 
 * functions
 - =M-x canvas-view-assignment=
