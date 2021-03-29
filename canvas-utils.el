@@ -265,6 +265,14 @@ prompt the user to select a course based on a list of course names"
                          '(body)
                          front-page-json)))
 
+(defun canvas-view-todo ()
+  (interactive)
+  (let* ((courseid (canvas--choose-course))
+         (todo-json (canvas--request (format "/api/v1/courses/%s/todo" courseid))))
+    (canvas-render-json '(url)
+                        '(body)
+                        todo-json)))
+
 (defun canvas-view-assignment ()
   (interactive)
   (let* ((courseid (canvas--choose-course))
