@@ -4,13 +4,10 @@
 (defcustom canvas-baseurl nil "Base url of canvas environment")
 (defcustom canvas-token nil "Canvas token")
 
-
 (defvar canvas--courses nil "List of your courses.")
 (defvar canvas--courseid2modules '()
   "List with cons cells of form (courseid . <seq of module jsons (incl items)>)")
 (defvar canvas--userid nil "User id")
-
-
 
 (defun canvas--list-courses (&optional force-reload)
   (if (and canvas--courses
@@ -51,8 +48,6 @@
                                            `((,courseid . ,modules))))
     modules))
 
-
-
 (defun canvas--flatten (seq)
   (cond
    ((null seq) nil)
@@ -60,10 +55,6 @@
     (list seq))
    (t (append (car seq)
               (canvas--flatten (cdr seq))))))
-
-
-
-
 
 (defun canvas--get-user-id (&optional force-reload)
   (if (and canvas--userid
@@ -115,9 +106,6 @@
                                  :error (cl-function (lambda (&key error-thrown data status &allow-other-keys)
                                                        (message "NO PAYLOAD: %s" error-thrown)))))
       (user-error "Please set a value for for `canvas-token' in order to complete API calls"))))
-
-
-
 
 (cl-defun canvas--json-find
     (keys json
@@ -174,7 +162,6 @@ from, returns the json such that its key-path value equals value"
                              (canvas--request (format "/api/v1/courses/%s/assignments"
                                                       courseid
                                                       '((per_page . 100))))))
-
 
 (cl-defun canvas--choose-from-jsons
     (name path-to-show
@@ -240,7 +227,6 @@ prompt the user to select a course based on a list of course names"
                                module-items
                                :path-to-return '(url))))
 
-
 (defun canvas--render-json (path-to-name path-to-content json)
   "given json object renders it in a separate buffer named according to path-to-name and"
   (let* ((buffer-name (canvas--json-find path-to-name json))
@@ -265,14 +251,6 @@ prompt the user to select a course based on a list of course names"
                          '(body)
                          front-page-json)))
 
-(defun canvas-view-todo ()
-  (interactive)
-  (let* ((courseid (canvas--choose-course))
-         (todo-json (canvas--request (format "/api/v1/courses/%s/todo" courseid))))
-    (canvas--render-json '(url)
-                        '(body)
-                        todo-json)))
-
 (defun canvas-view-assignment ()
   (interactive)
   (let* ((courseid (canvas--choose-course))
@@ -290,13 +268,10 @@ prompt the user to select a course based on a list of course names"
                          '(message)
                          announcement-json)))
 
-
 (defun canvas-view-module ()
   (interactive)
   (let* ((courseid (canvas--choose-course))
          (url (canvas--choose-module-item courseid)))
     (funcall browse-url-browser-function url)))
-
-
 
 (provide 'canvas-utils)
