@@ -1,6 +1,4 @@
 #+TITLE: Readme
-This is an updated fork of canvas-emacs to work on the latest Emacs 27.1 / 28 HEAD
-
 * Setup
 Clone this repo and add the following emacs lisp to your init accordingly:
 #+begin_src emacs-lisp
@@ -16,7 +14,6 @@ Clone this repo and add the following emacs lisp to your init accordingly:
 
 * Known Issues
 Courses without a front page will throw an error
-
 * Functions
 - =M-x canvas-view-assignment=
 - =M-x canvas-view-announcement=
